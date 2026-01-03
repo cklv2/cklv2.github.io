@@ -1,11 +1,303 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-Hant">
 <head>
- <meta charset="UTF-8">
- <title>我的 GitHub Pages 網站</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K1 字母單字大冒險 🍎🐻🐱</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --text-color: #2c3e50;
+            --accent-color: #ff6b6b;
+            --btn-color: #4cd137;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            text-align: center;
+            pointer-events: none;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .letter-display {
+            font-size: 40px;
+            color: #95afc0;
+            margin-bottom: 5px;
+        }
+
+        .word-display {
+            font-size: 64px;
+            color: var(--accent-color);
+            text-shadow: 3px 3px 0px white;
+            margin-bottom: 5px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #hint {
+            font-size: 20px;
+            color: #555;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 25px;
+            border-radius: 50px;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        canvas {
+            display: block;
+            cursor: pointer;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            display: flex;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .game-btn {
+            padding: 15px 30px;
+            font-size: 24px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        #next-btn {
+            background-color: var(--btn-color);
+            box-shadow: 0 8px 0 #44bd32;
+        }
+
+        #next-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #44bd32;
+        }
+
+        #reset-btn {
+            background-color: #718093;
+            box-shadow: 0 8px 0 #2f3640;
+        }
+
+        #reset-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 4px 0 #2f3640;
+        }
+    </style>
 </head>
 <body>
- <h1>你好！GitHub Pages 已經成功運作 🎉</h1>
- <p>呢度係我嘅第一個 GitHub Pages 頁面。</p>
+
+    <div id="ui-layer">
+        <div id="letter-title" class="letter-display">Alphabet A</div>
+        <div id="word" class="word-display">APPLE</div>
+        <div id="hint">摸摸看！ (Touch me!)</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="controls">
+        <button id="reset-btn" class="game-btn">重新開始</button>
+        <button id="next-btn" class="game-btn">下一個 (NEXT) ➡️</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const wordEl = document.getElementById('word');
+        const letterEl = document.getElementById('letter-title');
+        const nextBtn = document.getElementById('next-btn');
+        const resetBtn = document.getElementById('reset-btn');
+
+        // A-Z 完整資料庫：每個字母至少 3 個單字與對應 Emoji
+        const alphabetData = {
+            'A': [{w:'APPLE', e:'🍎'}, {w:'ANT', e:'🐜'}, {w:'ARM', e:'💪'}],
+            'B': [{w:'BANANA', e:'🍌'}, {w:'BEAR', e:'🐻'}, {w:'BALL', e:'⚽'}],
+            'C': [{w:'CAT', e:'🐱'}, {w:'CAKE', e:'🍰'}, {w:'CAR', e:'🚗'}],
+            'D': [{w:'DOG', e:'🐶'}, {w:'DUCK', e:'🦆'}, {w:'DOOR', e:'🚪'}],
+            'E': [{w:'EGG', e:'🥚'}, {w:'ELEPHANT', e:'🐘'}, {w:'EYE', e:'👁️'}],
+            'F': [{w:'FISH', e:'🐟'}, {w:'FLOWER', e:'🌸'}, {w:'FROG', e:'🐸'}],
+            'G': [{w:'GRAPE', e:'🍇'}, {w:'GIRAFFE', e:'🦒'}, {w:'GHOST', e:'👻'}],
+            'H': [{w:'HAT', e:'👒'}, {w:'HORSE', e:'🐎'}, {w:'HOUSE', e:'🏠'}],
+            'I': [{w:'ICE CREAM', e:'🍦'}, {w:'IGLOO', e:'🛖'}, {w:'ISLAND', e:'🏝️'}],
+            'J': [{w:'JELLY', e:'🍮'}, {w:'JUICE', e:'🍹'}, {w:'JEEP', e:'🚙'}],
+            'K': [{w:'KITE', e:'🪁'}, {w:'KANGAROO', e:'🦘'}, {w:'KING', e:'👑'}],
+            'L': [{w:'LEMON', e:'🍋'}, {w:'LION', e:'🦁'}, {w:'LEAF', e:'🍃'}],
+            'M': [{w:'MOON', e:'🌙'}, {w:'MOUSE', e:'🐭'}, {w:'MONKEY', e:'🐒'}],
+            'N': [{w:'NOSE', e:'👃'}, {w:'NEST', e:'🪹'}, {w:'NET', e:'🕸️'}],
+            'O': [{w:'ORANGE', e:'🍊'}, {w:'OWL', e:'🦉'}, {w:'OCTOPUS', e:'🐙'}],
+            'P': [{w:'PIG', e:'🐷'}, {w:'PENCIL', e:'✏️'}, {w:'PIZZA', e:'🍕'}],
+            'Q': [{w:'QUEEN', e:'👸'}, {w:'QUACK', e:'🦆'}, {w:'QUESTION', e:'❓'}],
+            'R': [{w:'RABBIT', e:'🐰'}, {w:'RAIN', e:'🌧️'}, {w:'ROBOT', e:'🤖'}],
+            'S': [{w:'SUN', e:'☀️'}, {w:'SNAKE', e:'🐍'}, {w:'STAR', e:'⭐'}],
+            'T': [{w:'TIGER', e:'🐯'}, {w:'TREE', e:'🌳'}, {w:'TRAIN', e:'🚂'}],
+            'U': [{w:'UMBRELLA', e:'☂️'}, {w:'UP', e:'⬆️'}, {w:'UNICORN', e:'🦄'}],
+            'V': [{w:'VAN', e:'🚐'}, {w:'VIOLET', e:'🌸'}, {w:'VOLCANO', e:'🌋'}],
+            'W': [{w:'WATER', e:'💧'}, {w:'WHALE', e:'🐋'}, {w:'WATCH', e:'⌚'}],
+            'X': [{w:'XYLOPHONE', e:'🎹'}, {w:'X-RAY', e:'🩻'}, {w:'XMAS TREE', e:'🎄'}],
+            'Y': [{w:'YO-YO', e:'🪀'}, {w:'YELLOW', e:'💛'}, {w:'YAK', e:'🐂'}],
+            'Z': [{w:'ZEBRA', e:'🦓'}, {w:'ZERO', e:'0️⃣'}, {w:'ZOO', e:'🦒'}]
+        };
+
+        const letters = Object.keys(alphabetData);
+        let currentLetterIndex = 0;
+        let currentItem = null;
+        
+        let particles = [];
+        let fruitScale = 1;
+        let targetScale = 1;
+        let fruitY = 0;
+        let fruitAngle = 0;
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            fruitY = canvas.height / 2;
+            pickRandomItem();
+        }
+
+        // 邏輯：從當前字母的清單中隨機選一個單字
+        function pickRandomItem() {
+            const possibleItems = alphabetData[letters[currentLetterIndex]];
+            const randomIndex = Math.floor(Math.random() * possibleItems.length);
+            currentItem = possibleItems[randomIndex];
+            updateUI();
+        }
+
+        function updateUI() {
+            letterEl.innerText = `Letter ${letters[currentLetterIndex]}`;
+            wordEl.innerText = currentItem.w;
+            wordEl.style.transform = "scale(1.2)";
+            setTimeout(() => wordEl.style.transform = "scale(1)", 300);
+            targetScale = 0.5; // 切換時的小動畫
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 12 + 4;
+                this.speedX = Math.random() * 8 - 4;
+                this.speedY = Math.random() * 8 - 4;
+                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+                this.alpha = 1;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.alpha -= 0.02;
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function createExplosion(x, y) {
+            for (let i = 0; i < 15; i++) {
+                particles.push(new Particle(x, y));
+            }
+        }
+
+        function handleInteraction(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const dist = Math.sqrt((x - canvas.width / 2) ** 2 + (y - fruitY) ** 2);
+            
+            // K1 小朋友友善判定：160px 超大觸摸區
+            if (dist < 160) {
+                targetScale = 1.4;
+                createExplosion(x, y);
+                fruitAngle = (Math.random() - 0.5) * 0.4;
+                speakWord(currentItem.w);
+            }
+        }
+
+        function speakWord(text) {
+            const msg = new SpeechSynthesisUtterance();
+            msg.text = text;
+            msg.lang = 'en-US';
+            msg.rate = 0.7; // 適合小朋友的語速
+            window.speechSynthesis.speak(msg);
+        }
+
+        nextBtn.addEventListener('click', () => {
+            currentLetterIndex = (currentLetterIndex + 1) % letters.length;
+            pickRandomItem();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            currentLetterIndex = 0;
+            pickRandomItem();
+        });
+
+        canvas.addEventListener('mousedown', handleInteraction);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handleInteraction(e);
+        }, {passive: false});
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 物理緩動：Spring Motion
+            fruitScale += (targetScale - fruitScale) * 0.12;
+            if (targetScale > 1) targetScale -= 0.03;
+            if (targetScale < 1) targetScale += 0.03;
+
+            // 繪製物體 (Emoji)
+            ctx.save();
+            ctx.translate(canvas.width / 2, fruitY);
+            ctx.rotate(fruitAngle);
+            ctx.scale(fruitScale, fruitScale);
+            ctx.font = "160px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.globalAlpha = 1;
+            if (currentItem) ctx.fillText(currentItem.e, 0, 0);
+            ctx.restore();
+
+            // 繪製粒子效果
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].alpha <= 0) {
+                    particles.splice(i, 1);
+                    i--;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', init);
+        
+        init();
+        animate();
+    </script>
 </body>
 </html>
